@@ -1,0 +1,26 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PATH=\"/d/esp32-idf-ahy/5.1.2/python_env/idf5.1_py3.11_env/Scripts:$PATH\" python:*)",
+      "Bash(/d/esp32-idf-ahy/5.1.2/python_env/idf5.1_py3.11_env/Scripts/python.exe:*)",
+      "Bash(export IDF_PATH=\"/d/esp32-idf-ahy/5.1.2/frameworks/esp-idf-v5.1.2\")",
+      "mcp__cc-codex__codex",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(find:*)",
+      "Bash(python:*)",
+      "mcp__auggie-mcp__codebase-retrieval",
+      "WebSearch",
+      "Bash(dir:*)",
+      "Bash(dir \"C:\\\\Users\\\\26410\\\\.config\\\\claude\")",
+      "Bash(mkdir:*)",
+      "Bash(mv:*)",
+      "Bash(cp:*)",
+      "Bash(git init:*)",
+      "Bash(tree:*)",
+      "Bash(git add:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

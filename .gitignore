@@ -1,0 +1,70 @@
+# ============================================
+# ESP-IDF (firmware/) 忽略规则
+# ============================================
+
+# 构建输出
+firmware/build/
+firmware/sdkconfig.old
+firmware/*.bin
+firmware/*.elf
+firmware/*.map
+
+# 依赖和缓存
+firmware/dependencies.lock
+firmware/managed_components/
+
+# IDE 配置（保留 .vscode 用于团队共享）
+firmware/.idea/
+firmware/*.swp
+firmware/*.swo
+firmware/*~
+
+# ============================================
+# ROS 工作空间忽略规则
+# ============================================
+
+# ROS 1 (Catkin)
+ros_workspace/build/
+ros_workspace/devel/
+ros_workspace/install/
+ros_workspace/.catkin_workspace
+ros_workspace/src/CMakeLists.txt
+
+# ROS 2 (Colcon)
+ros_workspace/log/
+ros_workspace/install/
+ros_workspace/build/
+
+# Python 编译文件
+ros_workspace/**/*.pyc
+ros_workspace/**/__pycache__/
+ros_workspace/**/*.egg-info/
+
+# ============================================
+# 通用忽略规则
+# ============================================
+
+# 操作系统
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# 编辑器
+*.swp
+*.swo
+*~
+.vscode/settings.json
+.vscode/launch.json
+
+# 临时文件
+*.log
+*.tmp
+nul
+
+# 压缩包
+*.zip
+*.tar.gz
+*.rar
+
+# 文档资料（可选，根据需要调整）
+雷达资料/
