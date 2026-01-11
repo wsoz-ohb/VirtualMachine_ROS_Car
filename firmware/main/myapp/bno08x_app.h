@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "freertos/semphr.h"
+extern QueueHandle_t imu_queue; //定义队列句柄
 
 
 
@@ -45,7 +46,6 @@ typedef struct {
 extern bno08x_data_t bno08x_data; //定义一个全局变量用于存储传感器数据
 
 void bno08x_app_init(void);
-void bno08x_app_test(void);
 void get_data(void);
 
 #endif // BNO08X_APP_H

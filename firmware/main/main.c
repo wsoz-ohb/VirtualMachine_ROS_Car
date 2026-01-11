@@ -6,7 +6,11 @@
 #include "freertos/queue.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
+#include "esp_wifi.h"
 
+
+#include "my_wifi_app.h"
+#include "my_socket.h"
 #include "motor_app.h"
 #include "bno08x_app.h"
 #include "my_oled.h"
@@ -21,6 +25,9 @@ void app_main(void)
     motor_app_init(); //初始化电机
     bno08x_app_init(); //初始化BNO08X传感器
     uart_app_init(); //初始化UART串口
+    my_wifi_app_start(); //启动WiFi
+    my_socket_start(); //启动UDP socket线程
+    
     //OLED_Init(); //初始化OLED显示屏
     //OLED_Clear(); //清屏
     //OLED_ShowStr(0,0,"Hello World!",OLED_FONT_SIZE_6X8); //显示字符串

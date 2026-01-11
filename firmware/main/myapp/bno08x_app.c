@@ -6,6 +6,10 @@ bno08x_data_t bno08x_data; //定义一个全局变量用于存储传感器数据
 #define I2C_MASTER_FREQ_HZ          400000  // 400kHz
 #define BNO08X_ADDR                 BNO080_DEFAULT_ADDRESS
 
+uint8_t data_flash_flag=0;  //imu数据刷新标志位
+UBaseType_t uxQueueLength=10;
+UBaseType_t uxItemSize=sizeof(float)*3; //队列每个元素大小,存放三个float数据
+QueueHandle_t imu_queue; //定义队列句柄
 
 void get_data(void)
 {
@@ -27,6 +31,8 @@ void get_data(void)
 		bno08x_data.roll=temp1;
 		bno08x_data.pitch=temp2;
 		bno08x_data.yaw=temp3;
+
+        data_flash_flag=1; //imu数据刷新完成
 	}
 }
 
@@ -34,7 +40,17 @@ void bno08x_app_task(void *pvParameters)
 {
     while (1) {
         get_data();
-        vTaskDelay(pdMS_TO_TICKS(100));
+        if(data_flash_flag==1)
+        {
+            data_flash_flag=0;
+            //将数据放入队列
+            float temp_data[3];
+            temp_data[0]=bno08x_data.roll;
+            temp_data[1]=bno08x_data.pitch;
+            temp_data[2]=bno08x_data.yaw;
+            xQueueSend(imu_queue, temp_data, portMAX_DELAY); 
+        }
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 }
 
@@ -86,20 +102,13 @@ void bno08x_app_init(void)
     enableAccelerometer(400);
     
     ESP_LOGI(TAG, "BNO08X initialized successfully");
+    
+    imu_queue=xQueueCreate(uxQueueLength, uxItemSize ); //队列创建
 
+    // 创建任务
     xTaskCreate(bno08x_app_task, "bno08x_app_task", 4096, NULL, 10, NULL);
 }
 
-void bno08x_app_test(void)
-{
-    if (dataAvailable()) {
-        float quatI = getQuatI();
-        float quatJ = getQuatJ();
-        float quatK = getQuatK();
-        float quatReal = getQuatReal();
-        
-    }
-}
 
 
 

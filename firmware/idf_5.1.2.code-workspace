@@ -52,7 +52,12 @@
 			"mcpwm.h": "c",
 			"motor_app.h": "c",
 			"bno08x_app.h": "c",
-			"oled_app.h": "c"
+			"oled_app.h": "c",
+			"cjson.h": "c",
+			"uart_app.h": "c",
+			"array": "c",
+			"string": "c",
+			"string_view": "c"
 		}
 	}
 }

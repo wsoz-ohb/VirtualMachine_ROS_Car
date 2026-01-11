@@ -17,8 +17,14 @@
 
 #define UART_BUF_SIZE           512                 // UART驱动缓冲区大小
 #define UART_RX_DMABUF_SIZE     512                 // UART接收临时缓冲区
-#define UART_RINGBUF_SIZE       512                 // 环形缓冲区大小
+#define UART_RINGBUF_SIZE       4096                // 环形缓冲区大小（约355ms数据）
 
+
+extern QueueHandle_t lidar_queue; //雷达数据队列句柄
+typedef struct {
+    uint16_t length;          // 数据长度
+    uint8_t data[UART_BUF_SIZE]; // 数据内容
+} lidar_packet_t; // 雷达数据包结构体
 /**
  * @brief 初始化UART应用
  * @note 会初始化UART硬件、环形缓冲区，并创建UART事件处理任务和数据处理任务
