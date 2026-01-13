@@ -18,7 +18,15 @@
       "Bash(cp:*)",
       "Bash(git init:*)",
       "Bash(tree:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(chmod:*)",
+      "Bash(echo:*)",
+      "Bash(rosversion:*)",
+      "Bash(source:*)",
+      "Bash(catkin_make:*)",
+      "Bash(rospack depends:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(git rm:*)"
     ],
     "deny": [],
     "ask": []

@@ -1,0 +1,162 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
+"""
+IMU UDP 接收节点
+功能：接收 ESP32 通过 UDP 发送的 IMU 数据（JSON 格式）
+端口：8080
+数据格式：{"type":"imu_data","data":{"roll":0.123,"pitch":-0.054,"yaw":1.570}}
+注意：
+  - ESP32 只发送欧拉角（roll, pitch, yaw）
+  - 欧拉角单位为弧度（radians），由四元数转换而来
+  - 角速度和线加速度未发送，ROS 消息中设置为 0
+"""
+
+import rospy
+import socket
+import json
+from sensor_msgs.msg import Imu
+from std_msgs.msg import Header
+from geometry_msgs.msg import Quaternion, Vector3
+import math
+
+
+class IMUReceiver:
+    def __init__(self):
+        # 初始化 ROS 节点
+        rospy.init_node('imu_receiver', anonymous=False)
+
+        # 获取参数
+        self.udp_ip = rospy.get_param('~udp_ip', '0.0.0.0')  # 监听所有接口
+        self.udp_port = rospy.get_param('~udp_port', 8080)
+        self.frame_id = rospy.get_param('~frame_id', 'imu_link')
+
+        # 创建发布者
+        self.imu_pub = rospy.Publisher('/imu/data', Imu, queue_size=10)
+
+        # 创建 UDP socket
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.bind((self.udp_ip, self.udp_port))
+        self.sock.settimeout(1.0)  # 设置超时，便于检查 rospy.is_shutdown()
+
+        rospy.loginfo("IMU UDP 接收节点已启动")
+        rospy.loginfo("监听地址: %s:%d" % (self.udp_ip, self.udp_port))
+        rospy.loginfo("发布话题: /imu/data")
+
+    def euler_to_quaternion(self, roll, pitch, yaw):
+        """
+        将欧拉角（弧度）转换为四元数
+        """
+        cy = math.cos(yaw * 0.5)
+        sy = math.sin(yaw * 0.5)
+        cp = math.cos(pitch * 0.5)
+        sp = math.sin(pitch * 0.5)
+        cr = math.cos(roll * 0.5)
+        sr = math.sin(roll * 0.5)
+
+        q = Quaternion()
+        q.w = cr * cp * cy + sr * sp * sy
+        q.x = sr * cp * cy - cr * sp * sy
+        q.y = cr * sp * cy + sr * cp * sy
+        q.z = cr * cp * sy - sr * sp * cy
+
+        return q
+
+    def parse_and_publish(self, data_str):
+        """
+        解析 JSON 数据并发布 IMU 消息
+        """
+        try:
+            # 解析 JSON
+            json_data = json.loads(data_str)
+
+            # 检查数据类型
+            if json_data.get('type') != 'imu_data':
+                rospy.logwarn("接收到非 IMU 数据: %s" % json_data.get('type'))
+                return
+
+            imu_data = json_data.get('data', {})
+
+            # 创建 Imu 消息
+            imu_msg = Imu()
+
+            # 填充消息头
+            imu_msg.header.stamp = rospy.Time.now()
+            imu_msg.header.frame_id = self.frame_id
+
+            # 姿态数据（欧拉角转四元数）
+            # 注意：ESP32 发送的已经是弧度（radians），不需要转换！
+            roll = imu_data.get('roll', 0.0)
+            pitch = imu_data.get('pitch', 0.0)
+            yaw = imu_data.get('yaw', 0.0)
+
+            imu_msg.orientation = self.euler_to_quaternion(roll, pitch, yaw)
+
+            # 角速度数据：ESP32 没有发送，设置为 0
+            imu_msg.angular_velocity.x = 0.0
+            imu_msg.angular_velocity.y = 0.0
+            imu_msg.angular_velocity.z = 0.0
+
+            # 线加速度数据：ESP32 没有发送，设置为 0
+            imu_msg.linear_acceleration.x = 0.0
+            imu_msg.linear_acceleration.y = 0.0
+            imu_msg.linear_acceleration.z = 0.0
+
+            # 协方差矩阵
+            # orientation: 有效数据，设置小的协方差
+            imu_msg.orientation_covariance = [0.01, 0, 0,
+                                              0, 0.01, 0,
+                                              0, 0, 0.01]
+            # angular_velocity: 无效数据，设置为 -1 表示不可用
+            imu_msg.angular_velocity_covariance[0] = -1
+            # linear_acceleration: 无效数据，设置为 -1 表示不可用
+            imu_msg.linear_acceleration_covariance[0] = -1
+
+            # 发布消息
+            self.imu_pub.publish(imu_msg)
+
+            rospy.logdebug("已发布 IMU 数据: roll=%.2f°, pitch=%.2f°, yaw=%.2f°" %
+                          (math.degrees(roll), math.degrees(pitch), math.degrees(yaw)))
+
+        except json.JSONDecodeError as e:
+            rospy.logerr("JSON 解析失败: %s" % str(e))
+        except Exception as e:
+            rospy.logerr("处理数据时出错: %s" % str(e))
+
+    def run(self):
+        """
+        主循环：接收 UDP 数据并发布
+        """
+        rospy.loginfo("开始接收 IMU 数据...")
+
+        while not rospy.is_shutdown():
+            try:
+                # 接收 UDP 数据
+                data, addr = self.sock.recvfrom(1024)  # 缓冲区大小 1024 字节
+
+                # 解码并处理
+                data_str = data.decode('utf-8')
+                self.parse_and_publish(data_str)
+
+            except socket.timeout:
+                # 超时是正常的，用于检查 rospy.is_shutdown()
+                continue
+            except Exception as e:
+                if not rospy.is_shutdown():
+                    rospy.logerr("接收数据时出错: %s" % str(e))
+
+        # 关闭 socket
+        self.sock.close()
+        rospy.loginfo("IMU UDP 接收节点已关闭")
+
+
+def main():
+    try:
+        receiver = IMUReceiver()
+        receiver.run()
+    except rospy.ROSInterruptException:
+        pass
+
+
+if __name__ == '__main__':
+    main()
