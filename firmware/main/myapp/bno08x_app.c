@@ -8,7 +8,7 @@ bno08x_data_t bno08x_data; //定义一个全局变量用于存储传感器数据
 
 uint8_t data_flash_flag=0;  //imu数据刷新标志位
 UBaseType_t uxQueueLength=10;
-UBaseType_t uxItemSize=sizeof(float)*3; //队列每个元素大小,存放三个float数据
+UBaseType_t uxItemSize=sizeof(float)*10; //队列每个元素大小,存放10个float数据
 QueueHandle_t imu_queue; //定义队列句柄
 
 void get_data(void)
@@ -23,6 +23,10 @@ void get_data(void)
 		bno08x_data.acc_x=getAccelX();
 		bno08x_data.acc_y=getAccelY();
 		bno08x_data.acc_z=getAccelZ();
+
+        bno08x_data.gyro_x=getGyroX();
+        bno08x_data.gyro_y=getGyroY();
+        bno08x_data.gyro_z=getGyroZ();
 		
 		float temp1=0;
 		float temp2=0;
@@ -44,10 +48,17 @@ void bno08x_app_task(void *pvParameters)
         {
             data_flash_flag=0;
             //将数据放入队列
-            float temp_data[3];
-            temp_data[0]=bno08x_data.roll;
-            temp_data[1]=bno08x_data.pitch;
-            temp_data[2]=bno08x_data.yaw;
+            float temp_data[10];
+            temp_data[0]=bno08x_data.quat_i;
+            temp_data[1]=bno08x_data.quat_j;
+            temp_data[2]=bno08x_data.quat_k;
+            temp_data[3]=bno08x_data.quat_real;
+            temp_data[4]=bno08x_data.acc_x;
+            temp_data[5]=bno08x_data.acc_y;
+            temp_data[6]=bno08x_data.acc_z;
+            temp_data[7]=bno08x_data.gyro_x;
+            temp_data[8]=bno08x_data.gyro_y;
+            temp_data[9]=bno08x_data.gyro_z;
             xQueueSend(imu_queue, temp_data, portMAX_DELAY); 
         }
         vTaskDelay(pdMS_TO_TICKS(500));
@@ -99,7 +110,9 @@ void bno08x_app_init(void)
     // 启用旋转向量，100ms更新一次
     enableRotationVector(100);
     //启用加速度计，100ms更新一次
-    enableAccelerometer(400);
+    enableAccelerometer(100);
+    //启动角速度计，100ms更新一次
+    enableGyro(100);
     
     ESP_LOGI(TAG, "BNO08X initialized successfully");
     

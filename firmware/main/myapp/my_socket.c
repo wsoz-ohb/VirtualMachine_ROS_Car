@@ -4,10 +4,12 @@
 #define IP_TARGET "192.168.2.9"  // 虚拟机IP地址
 #define PORT 8080       // imu目标端口
 #define PORT2 8081      // lidar目标端口2
+#define PORT3 8082      // 编码器目标端口3
 
 static const char *TAG = "my_socket";
 struct sockaddr_in server_addr;
 struct sockaddr_in server_addr2;
+struct sockaddr_in server_addr3;
 static int sock = -1; // UDP套接字
 struct rt_ringbuffer rec_ringbuffer; // 接收缓冲区
 rt_uint8_t recv_buf[1024];
@@ -34,8 +36,6 @@ int my_socket_init(void)
         sock = -1;
         return -1;
     }
-
-    my_socket_stat = SOCKET_READY;
     ESP_LOGI(TAG, "UDP socket1 created successfully");
 
 
@@ -55,17 +55,27 @@ int my_socket_init(void)
         sock = -1;
         return -1;
     }
-
-    my_socket_stat = SOCKET_READY;
     ESP_LOGI(TAG, "UDP socket2 created successfully");
+
+    // 初始化服务器地址结构
+    server_addr3.sin_family = AF_INET;
+    server_addr3.sin_port = htons(PORT3);
+    if (inet_pton(AF_INET, IP_TARGET, &server_addr3.sin_addr) <= 0) {
+        ESP_LOGE(TAG, "Invalid server address");
+        close(sock);
+        sock = -1;
+        return -1;
+    }
+    my_socket_stat = SOCKET_READY;
+    ESP_LOGI(TAG, "UDP socket3 created successfully");
     return sock;
 }
 
 void socket_init_thread(void *pvParameters)
 {
     ESP_LOGI(TAG, "Socket thread waiting for Wi-Fi...");
-    // 发送线程需要两路同时放行，用计数信号量解锁两个发送任务
-    socket_ok_to_send = xSemaphoreCreateCounting(2, 0);
+    // 发送线程需要三路同时放行，用计数信号量解锁三个发送任务
+    socket_ok_to_send = xSemaphoreCreateCounting(3, 0);
     if(socket_ok_to_send == NULL)
     {
         ESP_LOGE(TAG, "Failed to create socket_ok_to_send semaphore");
@@ -92,6 +102,7 @@ void socket_init_thread(void *pvParameters)
     ESP_LOGI(TAG, "UDP socket is ready!");
     xSemaphoreGive(socket_ok_to_send);
     xSemaphoreGive(socket_ok_to_send);
+    xSemaphoreGive(socket_ok_to_send);
     xSemaphoreGive(socket_ok_to_rec);
     vTaskDelete(NULL);
 }
@@ -106,23 +117,37 @@ void socket_send_thread(void *pvParameters)
         if(my_socket_stat == SOCKET_READY)
         {
             //imu数据发送
-            float temp_data[3];
+            float temp_data[10];
             xQueueReceive(imu_queue, temp_data, portMAX_DELAY);//从队列接收数据imu
             //构建json数据
             // {
             // "type": "imu_data",
             // "data": {
-            // "roll": 0.123456,
-            // "pitch": -0.054321,
-            // "yaw": 1.570796
+            // "quat_i": 0.123456,
+            // "quat_j": -0.054321,
+            // "quat_k": 1.570796,
+            // "quat_real": 0.123456,
+            // "acc_x": -0.054321,
+            // "acc_y": 1.570796,
+            // "acc_z": 0.123456,
+            // "gyro_x": -0.054321,
+            // "gyro_y": 1.570796,
+            // "gyro_z": 0.123456
             // }
             // }
             cJSON *root = cJSON_CreateObject();
             cJSON_AddStringToObject(root, "type", "imu_data");
             cJSON *data = cJSON_CreateObject();
-            cJSON_AddNumberToObject(data, "roll", bno08x_data.roll);
-            cJSON_AddNumberToObject(data, "pitch", bno08x_data.pitch);
-            cJSON_AddNumberToObject(data, "yaw", bno08x_data.yaw);
+            cJSON_AddNumberToObject(data, "quat_i", temp_data[0]);
+            cJSON_AddNumberToObject(data, "quat_j", temp_data[1]);
+            cJSON_AddNumberToObject(data, "quat_k", temp_data[2]);
+            cJSON_AddNumberToObject(data, "quat_real", temp_data[3]);
+            cJSON_AddNumberToObject(data, "acc_x", temp_data[4]);
+            cJSON_AddNumberToObject(data, "acc_y", temp_data[5]);
+            cJSON_AddNumberToObject(data, "acc_z", temp_data[6]);
+            cJSON_AddNumberToObject(data, "gyro_x", temp_data[7]);
+            cJSON_AddNumberToObject(data, "gyro_y", temp_data[8]);
+            cJSON_AddNumberToObject(data, "gyro_z", temp_data[9]);
             cJSON_AddItemToObject(root, "data", data);
             char *json_string = cJSON_PrintUnformatted(root); // 将JSON对象转换为字符串
 
@@ -170,6 +195,41 @@ void socket_send_thread2(void *pvParameters)
         }
 
         vTaskDelay(5 / portTICK_PERIOD_MS);  // 5ms检查一次，快速消费队列
+    }
+}
+
+
+void socket_send_thread3(void *pvParameters)
+{
+    ESP_LOGI(TAG, "Socket_send thread3 waiting for socket...");
+    xSemaphoreTake(socket_ok_to_send, portMAX_DELAY);
+
+    while (1)
+    {
+        if(my_socket_stat == SOCKET_READY) {
+            //编码器数据发送
+            cJSON *root = cJSON_CreateObject();
+            cJSON_AddStringToObject(root, "type", "odometry");
+            cJSON_AddNumberToObject(root, "left_rpm", left_encoder.rpm);
+            cJSON_AddNumberToObject(root, "right_rpm", right_encoder.rpm);
+            char *json_string = cJSON_PrintUnformatted(root);
+
+            int data_sent = sendto(sock, json_string, strlen(json_string), 0,
+                            (struct sockaddr *)&server_addr3, sizeof(server_addr3));
+            if (data_sent < 0)
+            {
+                ESP_LOGE(TAG, "Failed to send encoder data: errno %d", errno);
+            }
+
+            // 释放内存
+            cJSON_free(json_string);
+            cJSON_Delete(root);
+        } else {
+            // WiFi未连接，丢弃数据
+            ESP_LOGD(TAG, "Socket not ready, dropping encoder data");
+        }
+
+        vTaskDelay(50 / portTICK_PERIOD_MS);  // 50ms发送一次编码器数据
     }
 }
 
@@ -254,6 +314,7 @@ void my_socket_start(void)
     // 创建发送线程
     xTaskCreate(socket_send_thread, "socket_send", 4096, NULL, 4, NULL);
     xTaskCreate(socket_send_thread2, "socket_send2", 4096, NULL, 4, NULL);
+    xTaskCreate(socket_send_thread3, "socket_send3", 4096, NULL, 4, NULL);
 
     // 创建接收线程
     xTaskCreate(socket_rec_thread, "socket_rec", 4096, NULL, 4, NULL);

@@ -18,6 +18,7 @@
 #include "ringbuffer.h"
 #include "bno08x_app.h"
 #include "uart_app.h"
+#include "motor_app.h"
 
 
 typedef enum {
