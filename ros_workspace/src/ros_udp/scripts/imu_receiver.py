@@ -5,11 +5,24 @@
 IMU UDP 接收节点
 功能：接收 ESP32 通过 UDP 发送的 IMU 数据（JSON 格式）
 端口：8080
-数据格式：{"type":"imu_data","data":{"roll":0.123,"pitch":-0.054,"yaw":1.570}}
+数据格式：{
+  "type": "imu_data",
+  "data": {
+    "quat_i": 0.123,      // 四元数 x
+    "quat_j": -0.054,     // 四元数 y
+    "quat_k": 1.570,      // 四元数 z
+    "quat_real": 0.123,   // 四元数 w
+    "acc_x": -0.054,      // 线加速度 x (m/s²)
+    "acc_y": 1.570,       // 线加速度 y
+    "acc_z": 0.123,       // 线加速度 z
+    "gyro_x": -0.054,     // 角速度 x (rad/s)
+    "gyro_y": 1.570,      // 角速度 y
+    "gyro_z": 0.123       // 角速度 z
+  }
+}
 注意：
-  - ESP32 只发送欧拉角（roll, pitch, yaw）
-  - 欧拉角单位为弧度（radians），由四元数转换而来
-  - 角速度和线加速度未发送，ROS 消息中设置为 0
+  - ESP32 发送完整的 IMU 数据（四元数 + 角速度 + 线加速度）
+  - 所有数据单位均符合 ROS 标准（四元数无单位，角速度 rad/s，加速度 m/s²）
 """
 
 import rospy
@@ -18,7 +31,6 @@ import json
 from sensor_msgs.msg import Imu
 from std_msgs.msg import Header
 from geometry_msgs.msg import Quaternion, Vector3
-import math
 
 
 class IMUReceiver:
@@ -43,24 +55,6 @@ class IMUReceiver:
         rospy.loginfo("监听地址: %s:%d" % (self.udp_ip, self.udp_port))
         rospy.loginfo("发布话题: /imu/data")
 
-    def euler_to_quaternion(self, roll, pitch, yaw):
-        """
-        将欧拉角（弧度）转换为四元数
-        """
-        cy = math.cos(yaw * 0.5)
-        sy = math.sin(yaw * 0.5)
-        cp = math.cos(pitch * 0.5)
-        sp = math.sin(pitch * 0.5)
-        cr = math.cos(roll * 0.5)
-        sr = math.sin(roll * 0.5)
-
-        q = Quaternion()
-        q.w = cr * cp * cy + sr * sp * sy
-        q.x = sr * cp * cy - cr * sp * sy
-        q.y = cr * sp * cy + sr * cp * sy
-        q.z = cr * cp * sy - sr * sp * cy
-
-        return q
 
     def parse_and_publish(self, data_str):
         """
@@ -84,39 +78,43 @@ class IMUReceiver:
             imu_msg.header.stamp = rospy.Time.now()
             imu_msg.header.frame_id = self.frame_id
 
-            # 姿态数据（欧拉角转四元数）
-            # 注意：ESP32 发送的已经是弧度（radians），不需要转换！
-            roll = imu_data.get('roll', 0.0)
-            pitch = imu_data.get('pitch', 0.0)
-            yaw = imu_data.get('yaw', 0.0)
+            # 四元数姿态数据（ESP32 直接发送四元数）
+            imu_msg.orientation.x = imu_data.get('quat_i', 0.0)
+            imu_msg.orientation.y = imu_data.get('quat_j', 0.0)
+            imu_msg.orientation.z = imu_data.get('quat_k', 0.0)
+            imu_msg.orientation.w = imu_data.get('quat_real', 1.0)  # 默认值 1.0 表示无旋转
 
-            imu_msg.orientation = self.euler_to_quaternion(roll, pitch, yaw)
+            # 角速度数据（rad/s）
+            imu_msg.angular_velocity.x = imu_data.get('gyro_x', 0.0)
+            imu_msg.angular_velocity.y = imu_data.get('gyro_y', 0.0)
+            imu_msg.angular_velocity.z = imu_data.get('gyro_z', 0.0)
 
-            # 角速度数据：ESP32 没有发送，设置为 0
-            imu_msg.angular_velocity.x = 0.0
-            imu_msg.angular_velocity.y = 0.0
-            imu_msg.angular_velocity.z = 0.0
-
-            # 线加速度数据：ESP32 没有发送，设置为 0
-            imu_msg.linear_acceleration.x = 0.0
-            imu_msg.linear_acceleration.y = 0.0
-            imu_msg.linear_acceleration.z = 0.0
+            # 线加速度数据（m/s²）
+            imu_msg.linear_acceleration.x = imu_data.get('acc_x', 0.0)
+            imu_msg.linear_acceleration.y = imu_data.get('acc_y', 0.0)
+            imu_msg.linear_acceleration.z = imu_data.get('acc_z', 0.0)
 
             # 协方差矩阵
-            # orientation: 有效数据，设置小的协方差
+            # orientation: 有效数据，设置小的协方差（BNO08x 精度较高）
             imu_msg.orientation_covariance = [0.01, 0, 0,
                                               0, 0.01, 0,
                                               0, 0, 0.01]
-            # angular_velocity: 无效数据，设置为 -1 表示不可用
-            imu_msg.angular_velocity_covariance[0] = -1
-            # linear_acceleration: 无效数据，设置为 -1 表示不可用
-            imu_msg.linear_acceleration_covariance[0] = -1
+            # angular_velocity: 有效数据，设置小的协方差
+            imu_msg.angular_velocity_covariance = [0.02, 0, 0,
+                                                    0, 0.02, 0,
+                                                    0, 0, 0.02]
+            # linear_acceleration: 有效数据，设置小的协方差
+            imu_msg.linear_acceleration_covariance = [0.04, 0, 0,
+                                                       0, 0.04, 0,
+                                                       0, 0, 0.04]
 
             # 发布消息
             self.imu_pub.publish(imu_msg)
 
-            rospy.logdebug("已发布 IMU 数据: roll=%.2f°, pitch=%.2f°, yaw=%.2f°" %
-                          (math.degrees(roll), math.degrees(pitch), math.degrees(yaw)))
+            rospy.logdebug("已发布 IMU 数据: quat=[%.3f,%.3f,%.3f,%.3f] gyro=[%.3f,%.3f,%.3f] acc=[%.3f,%.3f,%.3f]" %
+                          (imu_msg.orientation.x, imu_msg.orientation.y, imu_msg.orientation.z, imu_msg.orientation.w,
+                           imu_msg.angular_velocity.x, imu_msg.angular_velocity.y, imu_msg.angular_velocity.z,
+                           imu_msg.linear_acceleration.x, imu_msg.linear_acceleration.y, imu_msg.linear_acceleration.z))
 
         except json.JSONDecodeError as e:
             rospy.logerr("JSON 解析失败: %s" % str(e))

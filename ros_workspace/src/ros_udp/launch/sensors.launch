@@ -1,0 +1,39 @@
+<!--
+  ESP32 UDP 数据接收 Launch 文件
+  启动所有传感器数据接收节点：IMU、里程计、激光雷达
+-->
+<launch>
+  <!-- 参数配置 -->
+  <arg name="imu_port" default="8080" />
+  <arg name="lidar_port" default="8081" />
+  <arg name="odom_port" default="8082" />
+
+  <!-- 小车物理参数 -->
+  <arg name="wheel_radius" default="0.033" doc="轮子半径 (m)" />
+  <arg name="wheel_base" default="0.15" doc="轮距 (m)" />
+
+  <!-- IMU 接收节点 -->
+  <node name="imu_receiver" pkg="ros_udp" type="imu_receiver.py" output="screen">
+    <param name="udp_port" value="$(arg imu_port)" />
+    <param name="frame_id" value="imu_link" />
+  </node>
+
+  <!-- 里程计接收节点 -->
+  <node name="odom_receiver" pkg="ros_udp" type="odom_receiver.py" output="screen">
+    <param name="udp_port" value="$(arg odom_port)" />
+    <param name="frame_id" value="odom" />
+    <param name="child_frame_id" value="base_link" />
+    <param name="wheel_radius" value="$(arg wheel_radius)" />
+    <param name="wheel_base" value="$(arg wheel_base)" />
+    <param name="publish_tf" value="true" />
+  </node>
+
+  <!-- 激光雷达接收节点 -->
+  <node name="lidar_receiver" pkg="ros_udp" type="lidar_receiver.py" output="screen">
+    <param name="udp_port" value="$(arg lidar_port)" />
+    <param name="frame_id" value="laser_link" />
+    <param name="range_min" value="0.1" />
+    <param name="range_max" value="8.0" />
+  </node>
+
+</launch>
