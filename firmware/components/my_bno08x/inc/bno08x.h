@@ -109,6 +109,11 @@ uint8_t resetReason(void);
   */
 float qToFloat(int16_t fixedPointValue, uint8_t qPoint);
 
+/** 获取最近一次解析的传感器报告ID
+  * @return 报告ID（用于区分旋转向量/加速度/陀螺仪）
+  */
+uint8_t getLastReportId(void);
+
 /** 检查是否有新数据可用
   * @return 1表示有数据，0表示无数据
   */

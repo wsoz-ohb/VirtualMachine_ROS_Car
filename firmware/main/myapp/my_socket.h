@@ -26,6 +26,13 @@ typedef enum {
     SOCKET_READY = 1
 } socket_state_t;
 
+typedef struct {
+    double linear_x;
+    double angular_z;
+} cmd_t;
+
+extern QueueHandle_t cmd_queq; //命令数据队列句柄
+
 void socket_init_thread(void *pvParameters);   // UDP 初始化线程
 void socket_send_thread(void *pvParameters); // UDP发送线程
 void socket_rec_thread(void *pvParameters); // UDP接收线程

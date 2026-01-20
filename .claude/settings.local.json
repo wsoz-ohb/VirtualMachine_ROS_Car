@@ -26,7 +26,14 @@
       "Bash(catkin_make:*)",
       "Bash(rospack depends:*)",
       "mcp__sequential-thinking__sequentialthinking",
-      "Bash(git rm:*)"
+      "Bash(git rm:*)",
+      "Bash(git push)",
+      "Bash(git stash:*)",
+      "Bash(git fetch:*)",
+      "Bash(git pull:*)",
+      "Bash(git config:*)",
+      "mcp__ace-tool__search_context",
+      "Skill(collaborating-with-codex)"
     ],
     "deny": [],
     "ask": []

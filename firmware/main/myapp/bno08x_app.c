@@ -1,4 +1,5 @@
 #include "bno08x_app.h"
+#include <stdbool.h>
 
 static const char *TAG = "BNO08X_APP";
 bno08x_data_t bno08x_data; //定义一个全局变量用于存储传感器数据
@@ -13,31 +14,59 @@ QueueHandle_t imu_queue; //定义队列句柄
 
 void get_data(void)
 {
-	if(dataAvailable())
-	{
-		bno08x_data.quat_i=getQuatI();
-		bno08x_data.quat_j=getQuatJ();
-		bno08x_data.quat_k=getQuatK();
-		bno08x_data.quat_real=getQuatReal();
-		
-		bno08x_data.acc_x=getAccelX();
-		bno08x_data.acc_y=getAccelY();
-		bno08x_data.acc_z=getAccelZ();
+    bool imu_updated = false;
 
-        bno08x_data.gyro_x=getGyroX();
-        bno08x_data.gyro_y=getGyroY();
-        bno08x_data.gyro_z=getGyroZ();
-		
-		float temp1=0;
-		float temp2=0;
-		float temp3=0;
-		QuaternionToEulerAngles(bno08x_data.quat_i,bno08x_data.quat_j,bno08x_data.quat_k,bno08x_data.quat_real,&temp1,&temp2,&temp3);
-		bno08x_data.roll=temp1;
-		bno08x_data.pitch=temp2;
-		bno08x_data.yaw=temp3;
+    // 循环消费所有可用的传感器包，避免 FIFO 积压
+    while (dataAvailable())
+    {
+        uint8_t report_id = getLastReportId();
 
-        data_flash_flag=1; //imu数据刷新完成
-	}
+        switch (report_id)
+        {
+        case SENSOR_REPORTID_ROTATION_VECTOR:
+        case SENSOR_REPORTID_GAME_ROTATION_VECTOR:
+            // 只在收到旋转向量包时更新四元数和欧拉角
+            bno08x_data.quat_i = getQuatI();
+            bno08x_data.quat_j = getQuatJ();
+            bno08x_data.quat_k = getQuatK();
+            bno08x_data.quat_real = getQuatReal();
+
+            float roll = 0, pitch = 0, yaw = 0;
+            QuaternionToEulerAngles(bno08x_data.quat_i, bno08x_data.quat_j,
+                                    bno08x_data.quat_k, bno08x_data.quat_real,
+                                    &roll, &pitch, &yaw);
+            bno08x_data.roll = roll;
+            bno08x_data.pitch = pitch;
+            bno08x_data.yaw = yaw;
+            imu_updated = true;
+            break;
+
+        case SENSOR_REPORTID_ACCELEROMETER:
+            // 只在收到加速度包时更新加速度
+            bno08x_data.acc_x = getAccelX();
+            bno08x_data.acc_y = getAccelY();
+            bno08x_data.acc_z = getAccelZ();
+            imu_updated = true;
+            break;
+
+        case SENSOR_REPORTID_GYROSCOPE:
+            // 只在收到陀螺仪包时更新角速度
+            bno08x_data.gyro_x = getGyroX();
+            bno08x_data.gyro_y = getGyroY();
+            bno08x_data.gyro_z = getGyroZ();
+            imu_updated = true;
+            break;
+
+        default:
+            // 忽略其他类型的报告
+            break;
+        }
+    }
+
+    if (imu_updated)
+    {
+        data_flash_flag = 1;
+    }
 }
 
 void bno08x_app_task(void *pvParameters)
@@ -59,9 +88,16 @@ void bno08x_app_task(void *pvParameters)
             temp_data[7]=bno08x_data.gyro_x;
             temp_data[8]=bno08x_data.gyro_y;
             temp_data[9]=bno08x_data.gyro_z;
-            xQueueSend(imu_queue, temp_data, portMAX_DELAY); 
+
+            // 使用非阻塞发送，队列满时丢弃旧数据
+            if (xQueueSend(imu_queue, temp_data, 0) != pdTRUE) {
+                // 队列满，丢弃最旧的数据并重试
+                float discard[10];
+                xQueueReceive(imu_queue, discard, 0);
+                xQueueSend(imu_queue, temp_data, 0);
+            }
         }
-        vTaskDelay(pdMS_TO_TICKS(500));
+        vTaskDelay(pdMS_TO_TICKS(50));
     }
 }
 
@@ -110,9 +146,9 @@ void bno08x_app_init(void)
     // 启用旋转向量，100ms更新一次
     enableRotationVector(100);
     //启用加速度计，100ms更新一次
-    enableAccelerometer(100);
+    enableAccelerometer(150);
     //启动角速度计，100ms更新一次
-    enableGyro(100);
+    enableGyro(200);
     
     ESP_LOGI(TAG, "BNO08X initialized successfully");
     

@@ -31,6 +31,9 @@ static uint8_t sequenceNumber[6] = {0, 0, 0, 0, 0, 0};
 /** 命令序列号 */
 static uint8_t commandSequenceNumber = 0;
 
+/** 最近一次解析的报告ID */
+static uint8_t lastReportId = 0;
+
 /** FRS元数据缓冲区 */
 static uint32_t metaData[MAX_METADATA_SIZE];
 
@@ -127,6 +130,15 @@ float qToFloat(int16_t fixedPointValue, uint8_t qPoint)
 }
 
 /**
+ * @brief 获取最近一次解析的传感器报告ID
+ * @return 报告ID（例如 SENSOR_REPORTID_ROTATION_VECTOR）
+ */
+uint8_t getLastReportId(void)
+{
+    return lastReportId;
+}
+
+/**
  * @brief 检查是否有新数据可用
  * @return 1表示有新数据，0表示无数据
  */
@@ -151,6 +163,9 @@ void parseInputReport(void)
 {
     int dataLength = ((uint16_t)shtpHeader[1] << 8 | shtpHeader[0]) & ~(1 << 15); // 计算数据长度（去除继续位）
     dataLength -= 4;                                                              // 减去头部长度
+
+    // 记录当前报告类型，便于上层判断
+    lastReportId = shtpData[5];
 
     uint8_t status = shtpData[5 + 2] & 0x03;                                                           // 提取状态/精度（低2位）
     uint16_t data1 = (uint16_t)shtpData[5 + 5] << 8 | shtpData[5 + 4];                                 // 提取数据1
