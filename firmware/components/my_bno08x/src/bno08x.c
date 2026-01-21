@@ -1,7 +1,8 @@
-﻿#include "bno08x.h"
+#include "bno08x.h"
 #include <math.h>
 #include <string.h>
 #include "esp_log.h"
+#include "i2c_mutex.h"
 
 static const char *TAG = "BNO08X";
 
@@ -819,10 +820,13 @@ uint8_t readFRSdata(uint16_t recordID, uint8_t startLocation, uint8_t wordsToRea
  */
 static uint8_t receivePacket(void)
 {
+    I2C_LOCK(); // 加锁保护整个读包过程
+
     uint8_t header[4]; // 头部缓冲区
     esp_err_t ret = i2c_master_read_from_device(i2c_port, _deviceAddress, header, 4, pdMS_TO_TICKS(1000));
     if (ret != ESP_OK)
     {
+        I2C_UNLOCK();
         return 0; // 读取头部失败
     }
 
@@ -830,6 +834,7 @@ static uint8_t receivePacket(void)
     if (packetLength <= 4)
     {                                  // 如果长度小于等于头部长度，无数据
         memcpy(shtpHeader, header, 4); // 保存头部
+        I2C_UNLOCK();
         return 1;                      // 返回成功（仅头部）
     }
 
@@ -846,6 +851,7 @@ static uint8_t receivePacket(void)
         ret = i2c_master_read_from_device(i2c_port, _deviceAddress, temp, numberOfBytesToRead + 4, pdMS_TO_TICKS(1000));
         if (ret != ESP_OK)
         {
+            I2C_UNLOCK();
             return 0; // 读取失败
         }
         for (uint8_t x = 0; x < numberOfBytesToRead; x++)
@@ -857,6 +863,8 @@ static uint8_t receivePacket(void)
         }
         bytesRemaining -= numberOfBytesToRead; // 更新剩余字节数
     }
+
+    I2C_UNLOCK();
     return 1; // 接收成功
 }
 
@@ -868,6 +876,8 @@ static uint8_t receivePacket(void)
  */
 static uint8_t sendPacket(uint8_t channelNumber, uint8_t dataLength)
 {
+    I2C_LOCK(); // 加锁保护发送过程
+
     uint16_t packetLength = dataLength + 4; // 总长度（头部4字节 + 数据）
     uint8_t packet[packetLength];           // 数据包缓冲区
 
@@ -882,6 +892,9 @@ static uint8_t sendPacket(uint8_t channelNumber, uint8_t dataLength)
     }
 
     esp_err_t ret = i2c_master_write_to_device(i2c_port, _deviceAddress, packet, packetLength, pdMS_TO_TICKS(1000));
+
+    I2C_UNLOCK();
+
     if (ret != ESP_OK)
     {
         return 0; // 发送失败

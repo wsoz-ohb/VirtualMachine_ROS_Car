@@ -6,6 +6,7 @@ this library is a 0.91'OLED(ssd1306) driver
 //Adapted for ESP-IDF I2C master driver
 #include "my_oled.h"
 #include "oledfont.h"
+#include "i2c_mutex.h"
 
 #include <stdbool.h>
 #include <string.h>
@@ -70,6 +71,8 @@ static esp_err_t oled_i2c_write(uint8_t control_byte, const uint8_t *payload, si
 		return ESP_ERR_INVALID_STATE;
 	}
 
+	I2C_LOCK(); // 加锁保护I2C写操作
+
 	i2c_cmd_handle_t cmd = i2c_cmd_link_create();
 	i2c_master_start(cmd);
 	i2c_master_write_byte(cmd, (OLED_ADDR << 1) | I2C_MASTER_WRITE, true);
@@ -82,6 +85,8 @@ static esp_err_t oled_i2c_write(uint8_t control_byte, const uint8_t *payload, si
 
 	esp_err_t err = i2c_master_cmd_begin(OLED_I2C_PORT, cmd, pdMS_TO_TICKS(100));
 	i2c_cmd_link_delete(cmd);
+
+	I2C_UNLOCK();
 
 	if (err != ESP_OK)
 	{

@@ -16,22 +16,27 @@
 #include "my_oled.h"
 #include "key_app.h"
 #include "uart_app.h"
+#include "i2c_mutex.h"
 
 #define TAG "main"
 
 void app_main(void)
 {
-    key_app_init(); //初始化按键
-    motor_app_init(); //初始化电机
-    bno08x_app_init(); //初始化BNO08X传感器
-    uart_app_init(); //初始化UART串口
-    my_wifi_app_start(); //启动WiFi
-    my_socket_start(); //启动UDP socket线程
+    i2c_mutex_init(); // 初始化I2C互斥锁（必须最先执行）
+    key_app_init(); // 初始化按键
 
+    // 先初始化OLED（纯写入设备，在IMU任务启动前完成）
+    OLED_Init();
+    OLED_Clear();
+    OLED_ShowStr(0, 0, "Booting...", OLED_FONT_SIZE_6X8);
 
-    // OLED_Init(); //初始化OLED显示屏
-    // OLED_Clear(); //清屏
-    // OLED_ShowStr(0,0,"Hello World!",OLED_FONT_SIZE_6X8); //显示字符串
+    motor_app_init(); // 初始化电机
+    bno08x_app_init(); // 初始化BNO08X传感器（任务在此启动）
+    uart_app_init(); // 初始化UART串口
+    my_wifi_app_start(); // 启动WiFi
+    my_socket_start(); // 启动UDP socket线程
+
+    OLED_ShowStr(0, 0, "Ready!     ", OLED_FONT_SIZE_6X8);
     while (1)
     {
 

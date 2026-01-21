@@ -7,5 +7,5 @@ idf_component_register(
     INCLUDE_DIRS "inc"
 
     # 3. 指定依赖的ESP-IDF组件
-    REQUIRES driver 
+    REQUIRES driver i2c_mutex
 )
