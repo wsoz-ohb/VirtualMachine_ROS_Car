@@ -1,28 +1,36 @@
 <!--
-  ESP32 UDP 数据接收 Launch 文件
-  启动所有传感器数据接收节点：IMU、里程计、激光雷达
+  ESP32 UDP 通信 Launch 文件
+  启动传感器接收和控制命令发送节点
 -->
 <launch>
-  <!-- 参数配置 -->
-  <arg name="imu_port" default="8080" />
-  <arg name="lidar_port" default="8081" />
-  <arg name="odom_port" default="8082" />
+  <!-- UDP 端口配置 -->
+  <arg name="sensor_port" default="8080" doc="传感器数据接收端口 (IMU+编码器)" />
+  <arg name="lidar_port" default="8081" doc="LiDAR 数据接收端口" />
+  <arg name="cmd_vel_port" default="8082" doc="cmd_vel 发送端口" />
+
+  <!-- ESP32 IP 地址 -->
+  <arg name="esp32_ip" default="192.168.2.18" />
 
   <!-- 小车物理参数 -->
-  <arg name="wheel_radius" default="0.033" doc="轮子半径 (m)" />
-  <arg name="wheel_base" default="0.15" doc="轮距 (m)" />
+  <arg name="wheel_radius" default="0.024" doc="轮子半径 (m) - 直径48mm" />
+  <arg name="wheel_base" default="0.125" doc="轮距 (m) - 125mm" />
 
-  <!-- IMU 接收节点 -->
-  <node name="imu_receiver" pkg="ros_udp" type="imu_receiver.py" output="screen">
-    <param name="udp_port" value="$(arg imu_port)" />
-    <param name="frame_id" value="imu_link" />
-  </node>
+  <!-- ==================== 静态 TF 配置 ==================== -->
+  <!-- base_link → imu_link: IMU 安装在车身中心 -->
+  <node pkg="tf" type="static_transform_publisher" name="base_to_imu"
+        args="0 0 0.05 0 0 0 base_link imu_link 100" />
 
-  <!-- 里程计接收节点 -->
-  <node name="odom_receiver" pkg="ros_udp" type="odom_receiver.py" output="screen">
-    <param name="udp_port" value="$(arg odom_port)" />
-    <param name="frame_id" value="odom" />
-    <param name="child_frame_id" value="base_link" />
+  <!-- base_link → laser_link: LiDAR 安装在车身前方上方 -->
+  <node pkg="tf" type="static_transform_publisher" name="base_to_laser"
+        args="0.05 0 0.1 0 0 0 base_link laser_link 100" />
+
+  <!-- ==================== 传感器节点 ==================== -->
+  <!-- 传感器接收节点 (IMU + 编码器) -->
+  <node name="sensor_receiver" pkg="ros_udp" type="sensor_receiver.py" output="screen">
+    <param name="udp_port" value="$(arg sensor_port)" />
+    <param name="imu_frame_id" value="imu_link" />
+    <param name="odom_frame_id" value="odom" />
+    <param name="base_frame_id" value="base_link" />
     <param name="wheel_radius" value="$(arg wheel_radius)" />
     <param name="wheel_base" value="$(arg wheel_base)" />
     <param name="publish_tf" value="true" />
@@ -34,6 +42,12 @@
     <param name="frame_id" value="laser_link" />
     <param name="range_min" value="0.1" />
     <param name="range_max" value="8.0" />
+  </node>
+
+  <!-- cmd_vel 发送节点 -->
+  <node name="cmd_vel_sender" pkg="ros_udp" type="cmd_vel_sender.py" output="screen">
+    <param name="esp32_ip" value="$(arg esp32_ip)" />
+    <param name="esp32_port" value="$(arg cmd_vel_port)" />
   </node>
 
 </launch>
