@@ -29,22 +29,21 @@ class ArrowKeyTeleop:
         rospy.init_node('arrow_key_teleop', anonymous=False)
 
         # 速度参数
-        self.linear_speed = rospy.get_param('~linear_speed', 0.2)   # m/s
-        self.angular_speed = rospy.get_param('~angular_speed', 0.5)  # rad/s
+        self.linear_speed = rospy.get_param('~linear_speed', 0.2)    # m/s (约80 RPM)
+        self.angular_speed = rospy.get_param('~angular_speed', 0.8)  # rad/s
 
         self.pub = rospy.Publisher('/cmd_vel', Twist, queue_size=1)
 
         self.settings = termios.tcgetattr(sys.stdin)
 
         print("=" * 50)
-        print("方向键遥控")
+        print("键盘遥控")
         print("=" * 50)
-        print("  ↑ 前进")
-        print("  ↓ 后退")
-        print("  ← 左转")
-        print("  → 右转")
-        print("  空格 停止")
-        print("  q 退出")
+        print("     q 前左    w 前进    e 前右")
+        print("     a 左转    s 后退    d 右转")
+        print("     z 后左              c 后右")
+        print("")
+        print("     空格 停止    x 退出")
         print("=" * 50)
         print("线速度: %.2f m/s, 角速度: %.2f rad/s" % (self.linear_speed, self.angular_speed))
         print("=" * 50)
@@ -69,27 +68,43 @@ class ArrowKeyTeleop:
             while not rospy.is_shutdown():
                 key = self.get_key()
 
-                if key == KEY_UP:
+                if key == 'w':
                     twist.linear.x = self.linear_speed
                     twist.angular.z = 0.0
                     print("前进")
-                elif key == KEY_DOWN:
+                elif key == 's':
                     twist.linear.x = -self.linear_speed
                     twist.angular.z = 0.0
                     print("后退")
-                elif key == KEY_LEFT:
+                elif key == 'a':
                     twist.linear.x = 0.0
                     twist.angular.z = self.angular_speed
                     print("左转")
-                elif key == KEY_RIGHT:
+                elif key == 'd':
                     twist.linear.x = 0.0
                     twist.angular.z = -self.angular_speed
                     print("右转")
+                elif key == 'q':
+                    twist.linear.x = self.linear_speed
+                    twist.angular.z = self.angular_speed
+                    print("前进+左转")
+                elif key == 'e':
+                    twist.linear.x = self.linear_speed
+                    twist.angular.z = -self.angular_speed
+                    print("前进+右转")
+                elif key == 'z':
+                    twist.linear.x = -self.linear_speed
+                    twist.angular.z = self.angular_speed
+                    print("后退+左转")
+                elif key == 'c':
+                    twist.linear.x = -self.linear_speed
+                    twist.angular.z = -self.angular_speed
+                    print("后退+右转")
                 elif key == ' ':
                     twist.linear.x = 0.0
                     twist.angular.z = 0.0
                     print("停止")
-                elif key == 'q' or key == '\x03':  # q 或 Ctrl+C
+                elif key == 'x' or key == '\x03':  # x 或 Ctrl+C
                     twist.linear.x = 0.0
                     twist.angular.z = 0.0
                     self.pub.publish(twist)
