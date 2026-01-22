@@ -23,9 +23,8 @@ void motor_app_init(void)
 {
     ESP_LOGI(TAG, "Initializing motors...");
     //pid参数初始化
-    PID_Init(&left_motor_pid, 6.2f, 0.62f, 0.0f, 1023.0f, -1023.0f);    //5.8 0.62
-    PID_Init(&right_motor_pid, 6.2f, 0.62f, 0.0f, 1023.0f, -1023.0f);
-
+    PID_Init(&left_motor_pid, 1.15f, 1.1f, 0.1f, 1023.0f, -1023.0f);    //6.2 0.62
+    PID_Init(&right_motor_pid, 1.15f, 1.1f, 0.1f, 1023.0f, -1023.0f);
     // 左电机配置
     left_motor.dir_mode = TB6612_MOTOR_DIR_UNNORMAL;
     left_motor.pwm_channel = LEDC_CHANNEL_0;
@@ -50,11 +49,6 @@ void motor_app_init(void)
     ESP_ERROR_CHECK(motor_encoder_init(&right_encoder, 1, 15, 16));
     ESP_LOGI(TAG, "Encoders initialized (left: GPIO6/7, right: GPIO15/16)");
     
-    // // Start motors at ~68% duty
-    // tb6612_motor_pwm_set(&left_motor, MOTOR_START_DUTY);
-    // tb6612_motor_pwm_set(&right_motor, MOTOR_START_DUTY);
-
-    // ESP_LOGI(TAG, "Motors started with PWM duty: %d", MOTOR_START_DUTY);
     xTaskCreate(motor_speed_ring_task,"motor_speed_ring_task",2048,NULL,10,NULL);
     
 }
@@ -94,7 +88,7 @@ void motor_speed_ring_task(void *pvParameters)
 
         // PID 闭环控制（每个周期都执行，不管是否收到新命令）
         int32_t target_duty_left = PID_location(target_speed_left, left_encoder.rpm, &left_motor_pid);
-        int32_t target_duty_right = PID_location(target_speed_right, right_encoder.rpm, &right_motor_pid);
+        int32_t target_duty_right = PID_location(-target_speed_right, right_encoder.rpm, &right_motor_pid);
 
         // 输出到电机
         tb6612_motor_pwm_set(&left_motor, target_duty_left);

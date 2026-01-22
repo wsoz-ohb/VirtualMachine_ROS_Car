@@ -43,7 +43,7 @@ void app_main(void)
         char line_buf[22];
         snprintf(line_buf, sizeof(line_buf), "L:%6.1f RPM", left_encoder.rpm);
         OLED_ShowStr(0, 2, line_buf, OLED_FONT_SIZE_6X8);
-        snprintf(line_buf, sizeof(line_buf), "R:%6.1f RPM", right_encoder.rpm);
+        snprintf(line_buf, sizeof(line_buf), "R:%6.1f RPM", -(right_encoder.rpm));
         OLED_ShowStr(0, 3, line_buf, OLED_FONT_SIZE_6X8);
 
         ESP_LOGI(TAG, "imu data: %f, %f, %f\r\n",bno08x_data.gyro_x, bno08x_data.gyro_y, bno08x_data.gyro_z);

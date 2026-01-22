@@ -36,10 +36,6 @@ void key_app_task(void *pvParameters)
         {
             xSemaphoreGive(key_semaphore);//释放信号量
         }
-        if(key_count>3)
-        {
-            key_count=1;
-        }
         vTaskDelay(pdMS_TO_TICKS(10));
     }
 

@@ -10,9 +10,13 @@
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "key.h"
+#include "motor_app.h"
+#include "tb6612_motor.h"
+#include "my_oled.h"
 
 extern uint8_t key_count;
 extern SemaphoreHandle_t key_semaphore; //按键信号量
+
 
 void key_app_init(void);
 void key_app_task(void *pvParameters);

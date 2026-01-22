@@ -16,6 +16,10 @@
 
 extern motor_encoder_t left_encoder;
 extern motor_encoder_t right_encoder;
+extern tb6612_motor_t left_motor;
+extern tb6612_motor_t right_motor;
+extern PID_LocTypeDef left_motor_pid;
+extern PID_LocTypeDef right_motor_pid;
 
 void motor_app_init(void);
 void motor_speed_ring_task(void *pvParameters);

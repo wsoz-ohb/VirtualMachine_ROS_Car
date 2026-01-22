@@ -4,7 +4,7 @@
 
 #include "tb6612_motor.h"
 
-#define IP_TARGET "192.168.2.9"  // 虚拟机IP地址
+#define IP_TARGET "192.168.2.19"  // 虚拟机IP地址
 #define PORT 8080       // 传感器数据发送端口 (IMU + 编码器)
 #define PORT2 8081      // LiDAR数据发送端口
 #define PORT3 8082      // 控制命令接收端口
